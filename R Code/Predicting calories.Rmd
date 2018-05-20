@@ -1,0 +1,186 @@
+---
+title: Predicting calories from the quantity of nutrients in the food using Multiple
+  Linear Regression
+author: "Mohsin Asif"
+date: "February 20, 2018"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction:
+
+In this project we are analyzing nutritional data to predict amount of calories in food. In our data set we have nutritional variables as covariates such as fat, sugar, carbohydrates, protein etc. we use these variables to predict response variable calories. 
+
+In the first part, we performed data cleaning by changing variable names and removing null values from our dataset. We then build linear regression model and performed model adequacy checking to make model more robust. Once we established that our regression is valid, we looked for multicollinearity in our dataset. We checked for multicollinearity in our model and it was very high and caused large Variance Inflation Factor(VIF). We did ANOVA test to check which variables are significant to get a clue on what will reduce multicollinearity in our model. We dropped some variables to reduce VIF to an acceptable level. Based on that we selected our final model.
+
+##Data Exploration and Data Cleaning:
+
+Firstly we will read the data file and load the CAR library
+
+install.packages("car")
+library(car)
+
+```{r}
+library(car)
+
+calories<-read.csv("C:/Users/Mohsin Asif/Box Sync/MS IS/Spring Semester/Flex 1/DAM/Final Project/Final Project Calories/calories.csv")
+
+str(calories)
+```
+
+We have some hard to handle variable names so we will replace them with names that are easy to read and work with.
+
+```{r}
+names(calories)
+
+names(calories)=c(
+  "Fast Food Restaurant",
+  "Type",
+  "ServingSize",
+  "Calories",
+  "TotalFat",
+  "SaturatedFat",
+  "TransFat",
+  "Sodium",
+  "Carbs",
+  "Sugars",
+  "Protein"
+)
+
+str(calories)
+```
+This looks better!
+
+Here is a short description of variables in our dataset:
+1.	FastFoodRest: which has the name of restaurant e.g. McDonalds, Wendy, Sonic etc.
+2.	Type: has the types of restaurants e.g. burger, MilkShake, Grilled Chicken etc.
+3.	ServingSize: contains the serving size in grams
+4.	Calories: has the number of calories per Serving Size
+5.	TotalFat: sum of saturated, monounsaturated and polyunsaturated fats in grams
+6.	SaturatedFat: saturated fat content in grams
+7.	TransFat: Trans fatty acids in grams which is unhealthy
+8.	Sodium_mg: Sodium content in milligrams
+9.	Protein: Protein content in grams
+
+We have two categorical variable columns i.e. Fast Food Restaurant and Type. We do not need this in our analysis so will subset our data and exclude these columns.
+
+```{r}
+calories<-calories[,3:11]
+
+str(calories)
+```
+
+Now the structure of data looks good. We have a total of 11 variables with 126 observations.
+
+We will now check for missing values in the data.
+
+```{r}
+any(is.na(calories))==TRUE
+
+which(is.na(calories))
+```
+
+We can see that data we have 11 missing values. This is a pretty big chunk of data to be removed from data without affecting results. So instead of removing, we will replace these values with column sum. 
+
+```{r}
+calories$TransFat[which(is.na(calories$TransFat))]<-mean(calories$TransFat,na.rm = TRUE)
+```
+
+Checking again to ensure we do not have any missing values in our data. 
+
+```{r}
+any(is.na(calories$TransFat))==TRUE
+
+any(is.na(calories))==TRUE
+```
+
+Checking the number of rows, first five rows of data frame, and summary of data.
+nrow(calories)
+```{r}
+head(calories, 5)
+
+summary(calories)
+```
+
+We have sodim is milligrams while other variables are in grams so lets convert Sodium from milligrams to grams to make it more consistent with rest of the data
+
+```{r}
+calories$Sodiumg=calories$Sodium/1000
+
+head(calories)
+```
+
+We will now check the correlation between various variables. 
+```{r}
+pairs(calories)
+
+```
+
+As we can see that Calories have positive correlation with almost all the variables except sugars. On the other hand, some covariates are highly correlated to other covariates which suggests that there might be multicollinearity in our model.
+
+##Model Building:
+
+```{r}
+model1<-lm(Calories~ServingSize+TotalFat+SaturatedFat+TransFat+Sodiumg+Carbs+Sugars+Protein, data=calories)
+
+summary(model1)
+
+vif(model1)
+
+```
+ServingSize, SaturatedFat, Sodium_g and Sugars are not good covariates as there p values are  > 0.05  thus we cannot reject the null hypothesis. Which implies in this model there is not a linear relationship between Calories and ServingSize, SaturatedFat, Sodium_g and Sugars. The VIF is also greater than 10 for some variable which is less than ideal.
+
+In order to overcome this, we build a new model model2 by dropping ServingSize, Sugars, SaturatedFat, Sodiumg. 
+
+```{r}
+model2<-lm(Calories~TotalFat+TransFat+Carbs+Protein, data=calories)
+
+summary(model2)
+
+vif(model2)
+```
+Looking at summary statistics of our new model we can see all the covariates are having a significant P and t value to express Calories linearly. VIF values are also less than 10 which is good.
+
+##Model Adequacy Checking:
+Lets check if our model meets all normality assumptions and actually valid model
+```{r}
+plot(model2)
+```
+
+#Equal variance assumption:
+Above in the first plot we have Residual vs Fitted Values , we dont see any pattern on the red line Thus residuals are linearly distributed over fitted values and we can say approximately that variance is equal.
+#Normality assumption:
+QQ plot  is fairly linear except few outliers. Standardized residuals mostly follow the fitted model line. Thus, meeting our normality assumption
+
+From the above graphs  we can see there are few outliers in our model . To fix those let's remove them  and build another model.
+```{r}
+calories<-calories[-c(77,81,85),]
+
+model2<-lm(Calories~TotalFat+TransFat+Carbs+Protein, data=calories)
+
+```
+Checking model adequecy again
+```{r}
+plot(model2)
+```
+
+The model looks fairly good meeting all the assumption of Linearity between response and regressor, Normality of error distribution, Independence of errors i.e. non-correlation, and equal variance of errors
+
+Looking at the VIF values of our model we can say that we do not have multicollinearity problem. Looking at the correlations between the variables earlier, we could see that there will be high multicollinearity but by dropping variables in  model in the early phase, we got rid of multicollinearity.
+All of the values are below 10 so we are good.
+
+##Final Model:
+
+
+Calories=3.25+8.57*TotalFat+13.65*TransFat+3.96*Carbs+3.88*Protein
+
+##Conclusion and Interpretation:
+
+After building our final model, we can say that while determining calories in a product nutrients such as total fat, trans fat, carbohydrates, and protein are most significant variables that largely explain the variation in calories. 
+Keeping all variables fixed, a unit increase in total fat in a food, increases calories by 8.57 on average. Similarly, trans fat causes 13.65 unit increase on average for every one unit increase. Lastly, carbs and proteins, cause calories to increase by 3.96 and 3.88 units on average for every one unit increase keeping all other variables fixed.  
+
